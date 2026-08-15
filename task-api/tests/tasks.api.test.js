@@ -273,3 +273,67 @@ describe('PATCH /tasks/:id/complete', () => {
     expect(res.body.priority).toBe('high'); // currently fails — returns 'medium'
   });
 });
+// ─── PATCH /tasks/:id/assign ──────────────────────────────────────────────────
+
+describe('PATCH /tasks/:id/assign', () => {
+  it('assigns a task to a person and returns the updated task', async () => {
+    const task = taskService.create({ title: 'Assign me' });
+    const res = await request(app)
+      .patch(`/tasks/${task.id}/assign`)
+      .send({ assignee: 'Alice' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.assignee).toBe('Alice');
+    expect(res.body.id).toBe(task.id);
+    expect(res.body.title).toBe('Assign me'); // other fields unchanged
+  });
+
+  it('returns 404 for a non-existent task id', async () => {
+    const res = await request(app)
+      .patch('/tasks/bad-id/assign')
+      .send({ assignee: 'Alice' });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 400 if assignee is missing from body', async () => {
+    const task = taskService.create({ title: 'Test' });
+    const res = await request(app)
+      .patch(`/tasks/${task.id}/assign`)
+      .send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBeDefined();
+  });
+
+  it('returns 400 if assignee is an empty string', async () => {
+    const task = taskService.create({ title: 'Test' });
+    const res = await request(app)
+      .patch(`/tasks/${task.id}/assign`)
+      .send({ assignee: '   ' }); // whitespace only
+
+    expect(res.status).toBe(400);
+  });
+
+  it('trims whitespace from assignee name', async () => {
+    const task = taskService.create({ title: 'Test' });
+    const res = await request(app)
+      .patch(`/tasks/${task.id}/assign`)
+      .send({ assignee: '  Bob  ' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.assignee).toBe('Bob'); // trimmed
+  });
+
+  it('allows reassigning a task that is already assigned', async () => {
+    const task = taskService.create({ title: 'Test' });
+    await request(app).patch(`/tasks/${task.id}/assign`).send({ assignee: 'Alice' });
+
+    const res = await request(app)
+      .patch(`/tasks/${task.id}/assign`)
+      .send({ assignee: 'Bob' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.assignee).toBe('Bob'); // reassignment is allowed
+  });
+});
